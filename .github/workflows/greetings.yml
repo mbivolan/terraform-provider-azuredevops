@@ -1,0 +1,51 @@
+
+name: Terraform DevOps Provider Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13
+      id: go
+    - name: Build Package
+      run: |
+        export GOPATH=$HOME/go
+        export GOBIN=$(go env GOPATH)/bin
+        export PATH=$PATH:$GOPATH
+        export PATH=$PATH:$GOBIN
+        ls "$GOPATH"
+        mkdir -p $GOPATH/src/github.com/terraform-providers/terraform-provider-azuredevops
+        cd $GOPATH/src/github.com/terraform-providers/terraform-provider-azuredevops
+        git clone https://github.com/microsoft/terraform-provider-azuredevops .
+        make build
+        mv $GOPATH/bin/terraform-provider-azuredevops /tmp/terraform-provider-azuredevops_v0.0.1
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: "latest"
+        release_name: "latest"
+        draft: false
+        prerelease: false
+    - name: Upload Release Asset
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: /tmp/terraform-provider-azuredevops_v0.0.1
+        asset_name: terraform-provider-azuredevops
+        asset_content_type: application/octet-stream
